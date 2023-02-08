@@ -1,9 +1,11 @@
 [package]
-name = "rust-codespaces"
-version = "0.1.0"
 authors = ["Your Name"]
 edition = "2018"
+name = "rust-codespaces"
+version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+serde = {version = "1.0.152", features = ["derive"]}
+serde_json = "1.0.92"
