@@ -1,43 +1,53 @@
+use async_graphql::{
+    http::GraphiQLSource, EmptyMutation, EmptySubscription, QueryRoot, Schema, SimpleObject,
+};
+use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
+use axum::{
+    extract::Extension,
+    response::{self, IntoResponse},
+    routing::get,
+    Router, Server,
+};
 use serde::{Deserialize, Serialize};
-use serde_json;
-use std::collections::HashMap;
 
-#[derive(Serialize, Deserialize, Debug)]
-enum City {
-    Berlin,
-    Paris,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, SimpleObject)]
 struct CityComment {
-    city: City,
+    city: String,
     comment: String,
 }
 
 type TypeOne = Option<Vec<CityComment>>;
 
-type TypeTwo = Option<HashMap<City, String>>;
+async fn graphql_handler(schema: Extension<CityComment>, req: GraphQLRequest) -> GraphQLResponse {
+    schema.execute(req.into_inner()).await.into()
+}
 
-fn main() {
+async fn graphiql() -> impl IntoResponse {
+    response::Html(GraphiQLSource::build().endpoint("/").finish())
+}
+
+#[tokio::main]
+async fn main() {
     let type_one = r#"
-        {
-            "Berlin": "bla"
-            "Paris": "bla2"
-        },
-    
-      "#;
-    let type_two = r#"
-      [{
-        "city": "Berlin",
-        "comment": "bla"
-      },{
-        "city": "Paris",
-        "comment": "bla2"
-      }]"#;
+  {
+      "Berlin": "bla"
+      "Paris": "bla2"
+  },
 
-    // let v: TypeOne = serde_json::from_str(type_one).unwrap();
-    // println!("{:#?}", v);
+"#;
 
-    let v: TypeTwo = serde_json::from_str(type_two).unwrap();
-    println!("{:#?}", v);
+    let schema = Schema::build(QueryRoot, EmptyMutation, EmptySubscription)
+        .data(type_one)
+        .finish();
+
+    let app = Router::new()
+        .route("/", get(graphiql).post(graphql_handler))
+        .layer(Extension(schema));
+
+    println!("GraphiQL IDE: http://localhost:8000");
+
+    Server::bind(&"127.0.0.1:8000".parse().unwrap())
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 }
