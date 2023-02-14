@@ -1,5 +1,6 @@
 use async_graphql::{
-    http::GraphiQLSource, EmptyMutation, EmptySubscription, QueryRoot, Schema, SimpleObject,
+    http::GraphiQLSource, Context, EmptyMutation, EmptySubscription, FieldResult, Object, Schema,
+    SimpleObject,
 };
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
 use axum::{
@@ -16,9 +17,26 @@ struct CityComment {
     comment: String,
 }
 
-type TypeOne = Option<Vec<CityComment>>;
+type AppState = CityComment;
+pub struct QueryRoot;
 
-async fn graphql_handler(schema: Extension<CityComment>, req: GraphQLRequest) -> GraphQLResponse {
+type AppSchema = Schema<QueryRoot, EmptyMutation, EmptySubscription>;
+
+/// Define GraphQL query schema.
+#[Object]
+impl QueryRoot {
+    async fn get_city(&self, ctx: &'_ Context<'_>) -> FieldResult<CityComment> {
+        let bla = r#"
+            {
+                "city": "bla",
+                "comment": "bla2"
+            }"#;
+
+        serde_json::from_str(bla).map_err(|error| error.into())
+    }
+}
+
+async fn graphql_handler(schema: Extension<AppSchema>, req: GraphQLRequest) -> GraphQLResponse {
     schema.execute(req.into_inner()).await.into()
 }
 
@@ -28,17 +46,12 @@ async fn graphiql() -> impl IntoResponse {
 
 #[tokio::main]
 async fn main() {
-    let type_one = r#"
-  {
-      "Berlin": "bla"
-      "Paris": "bla2"
-  },
+    let state = CityComment {
+        city: "city123".to_string(),
+        comment: "comment123".to_string(),
+    };
 
-"#;
-
-    let schema = Schema::build(QueryRoot, EmptyMutation, EmptySubscription)
-        .data(type_one)
-        .finish();
+    let schema = Schema::build(QueryRoot, EmptyMutation, EmptySubscription).finish();
 
     let app = Router::new()
         .route("/", get(graphiql).post(graphql_handler))
